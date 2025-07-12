@@ -5,9 +5,6 @@ import { ReasonPhrases } from "./reason-phrase";
 
 //200 OK
 export const success = (res: Response, data: any, msg: string) => {
-  if (APP_SETTINGS.ENCRYPT) {
-    //encrypt data
-  }
   const response = {
     result: data,
     status: ReasonPhrases.OK,

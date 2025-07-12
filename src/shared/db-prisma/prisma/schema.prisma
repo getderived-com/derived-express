@@ -1,0 +1,355 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and message attribution
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String?  // Made optional for OAuth users
+  avatar    String?
+  provider  String?  @default("local") // local, google, github, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  conversations ConversationParticipant[]
+  messages      Message[]
+  uploadedFiles File[]
+  chatSettings  ChatSettings?
+  events        Event[]
+  assignedTasks Task[]
+
+  @@map("users")
+}
+
+// Conversation model to group messages together
+model Conversation {
+  id          Int      @id @default(autoincrement())
+  title       String?  @default("New Conversation")
+  description String?
+  isArchived  Boolean  @default(false)
+  settings    String?  // Store conversation-specific settings as JSON string
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+// Junction table for conversation participants
+model ConversationParticipant {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  userId         Int
+  role           String   @default("member") // member, admin, viewer
+  joinedAt       DateTime @default(now())
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// Message model for individual chat messages
+model Message {
+  id             Int         @id @default(autoincrement())
+  conversationId Int
+  userId         Int?        // null for system/AI messages
+  content        String
+  messageType    MessageType @default(TEXT)
+  role           MessageRole
+  model          String?     // AI model used (for assistant messages)
+  reasoning      String?     // AI reasoning data as JSON string
+  metadata       String?     // Additional message metadata as JSON string
+  parentId       Int?        // For threaded conversations
+  isEdited       Boolean     @default(false)
+  isDeleted      Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parent       Message?        @relation("MessageThread", fields: [parentId], references: [id])
+  replies      Message[]       @relation("MessageThread")
+  files        File[]
+  sources      MessageSource[]
+  tools        MessageTool[]
+
+  @@map("messages")
+}
+
+// File model for uploaded attachments
+model File {
+  id           Int      @id @default(autoincrement())
+  messageId    Int?
+  userId       Int?
+  originalName String
+  filename     String   @unique
+  mimeType     String
+  size         Int
+  url          String
+  path         String?  // Local file path if stored locally
+  metadata     String?  // Additional file metadata as JSON string
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("files")
+}
+
+// Message sources for referencing external content
+model MessageSource {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  title     String
+  url       String
+  type      String?  @default("web") // web, document, image, etc.
+  metadata  String?  // Additional source metadata as JSON string
+  createdAt DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_sources")
+}
+
+// AI tool calls and results
+model MessageTool {
+  id            Int        @id @default(autoincrement())
+  messageId     Int
+  name          String
+  description   String?
+  status        ToolStatus @default(PENDING)
+  parameters    String?    // Tool input parameters as JSON string
+  result        String?    // Tool output
+  error         String?    // Error message if tool failed
+  executionTime Int?       // Execution time in milliseconds
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_tools")
+}
+
+// Chat-related configuration and settings
+model ChatSettings {
+  id              Int      @id @default(autoincrement())
+  userId          Int?     @unique // null for global settings
+  modelId         String   @default("gpt-4")
+  temperature     Float    @default(0.7)
+  maxTokens       Int      @default(4000)
+  systemPrompt    String?  
+  enableWebSearch Boolean  @default(false)
+  enableTools     Boolean  @default(true)
+  settings        String?  // Additional settings as JSON string
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_settings")
+}
+
+// Additional models for the broader application
+
+// Countries model (based on existing code)
+model Country {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("countries")
+}
+
+// Payment model (based on existing code)
+model Payment {
+  id          Int           @id @default(autoincrement())
+  amount      Float         
+  currency    String        @default("USD")
+  status      PaymentStatus @default(PENDING)
+  method      String?       // credit_card, paypal, etc.
+  description String?
+  customerId  String?
+  metadata    String?       // JSON string
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+// Calendar events (based on existing calendar functionality)
+model Event {
+  id             Int       @id @default(autoincrement())
+  title          String
+  description    String?   
+  startTime      DateTime
+  endTime        DateTime
+  allDay         Boolean   @default(false)
+  color          String?   @default("#3b82f6")
+  location       String?
+  url            String?
+  userId         Int?
+  googleEventId  String?   @unique // For Google Calendar sync
+  isRecurring    Boolean   @default(false)
+  recurrenceRule String?   // RRULE for recurring events
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  participants EventParticipant[]
+
+  @@map("events")
+}
+
+// Event participants
+model EventParticipant {
+  id      Int                 @id @default(autoincrement())
+  eventId Int
+  email   String
+  name    String?
+  status  ParticipationStatus @default(PENDING)
+  role    String?             @default("attendee") // organizer, attendee, optional
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@map("event_participants")
+}
+
+// Kanban/Project management models (based on existing code)
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  
+  color       String?  @default("#3b82f6")
+  isArchived  Boolean  @default(false)
+  settings    String?  // JSON string
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  boards Board[]
+  tasks  Task[]
+
+  @@map("projects")
+}
+
+model Board {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  name      String
+  position  Int      @default(0)
+  color     String?  @default("#6b7280")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@map("boards")
+}
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  boardId     Int
+  title       String
+  description String?    
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(TODO)
+  position    Int        @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  assigneeId  Int?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  board    Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  assignee User?   @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@map("tasks")
+}
+
+// Enums
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+  ERROR
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ToolStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  ERROR
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum ParticipationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  TENTATIVE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}

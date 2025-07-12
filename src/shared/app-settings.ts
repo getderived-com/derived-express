@@ -1,58 +1,50 @@
 const {
-  APP_NAME = "derived",
   NODE_ENV = "development",
   PORT = 3001,
-  ENCRYPT = false,
-  NODE_HOST = "localhost",
-  REDIS_HOST = "",
-  REDIS_PORT = "6379",
-  DB_NAME = "little-zoho",
-  DB_HOST = "localhost",
-  DB_PORT = "5434",
-  DB_USERNAME = "postgres",
-  DB_PASSWORD = "",
-  DEFAULT_IMAGE_QUALITY_REDUCTION,
-  SENDER_EMAIL_HOST = "",
-  SENDER_EMAIL_PORT,
-  SENDER_EMAIL_ID = "",
-  SENDER_EMAIL_PASSWORD = "",
-  JWT_SECRET = "secret",
-  PAYMENT_API,
-  FIREBASE_PRIVATE_KEY_ID,
-  RAZORPAY_KEY,
-  RAZORPAY_SECRET,
-  OPEN_AI_API,
-  ENABLE_AI_TAB = 0,
-  // ADD NEW ENV VARIABLES
+  JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production",
+  JWT_EXPIRES_IN = "7d",
+  ALLOWED_ORIGINS = "http://localhost:3000",
+  DATABASE_URL = "",
+  // AI Configuration
+  OPENAI_API_KEY = "",
+  GOOGLE_AI_API_KEY = "",
+  ANTHROPIC_API_KEY = "",
+  DEFAULT_AI_PROVIDER = "google",
+  DEFAULT_AI_MODEL = "",
+  AI_TEMPERATURE = "0.7",
+  AI_MAX_TOKENS = "4000",
 } = process.env;
 
+if (NODE_ENV === 'production') {
+  const requiredEnvVars = ['JWT_SECRET', 'DATABASE_URL'];
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+  
+  if (JWT_SECRET === 'your-super-secret-jwt-key-change-this-in-production') {
+    throw new Error('JWT_SECRET must be changed in production!');
+  }
+}
+
 export const APP_SETTINGS = {
-  SENDER_EMAIL_PORT: parseInt(SENDER_EMAIL_PORT || "465"),
-  SENDER_EMAIL_HOST,
-  SENDER_EMAIL_ID,
-  SENDER_EMAIL_PASSWORD,
   NODE_ENV,
-  PORT,
-  DB_NAME,
-  DB_HOST,
-  DB_PORT: parseInt(DB_PORT),
-  DB_USERNAME,
-  DB_PASSWORD,
-  ENCRYPT,
-  NODE_HOST,
-  APP_NAME,
-  DEFAULT_IMAGE_QUALITY_REDUCTION: parseInt(
-    DEFAULT_IMAGE_QUALITY_REDUCTION || "80",
-  ),
-  IS_DEVELOPMENT: true,
+  PORT: parseInt(String(PORT)),
+  IS_DEVELOPMENT: NODE_ENV === 'development',
+  IS_PRODUCTION: NODE_ENV === 'production',
   JWT_SECRET,
-  PAYMENT_API,
-  FIREBASE_PRIVATE_KEY_ID,
-  RAZORPAY_KEY,
-  RAZORPAY_SECRET,
-  REDIS_HOST,
-  REDIS_PORT,
-  OPEN_AI_API,
-  ENABLE_AI_TAB: ENABLE_AI_TAB == 0 ? false : true,
-  // ADD NEW APP SETTINGS
+  JWT_EXPIRES_IN,
+  ALLOWED_ORIGINS,
+  DATABASE_URL,
+  // AI Configuration
+  AI: {
+    OPENAI_API_KEY,
+    GOOGLE_AI_API_KEY,
+    ANTHROPIC_API_KEY,
+    DEFAULT_AI_PROVIDER,
+    DEFAULT_AI_MODEL,
+    AI_TEMPERATURE: parseFloat(AI_TEMPERATURE),
+    AI_MAX_TOKENS: parseInt(AI_MAX_TOKENS),
+  },
 };

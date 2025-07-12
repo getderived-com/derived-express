@@ -48,7 +48,7 @@ export const validateRequest = (
   }
 
   if (Object.keys(errors).length > 0) {
-    throw new BadRequestError("Validation failed", errors);
+    throw new BadRequestError("Validation failed", errors.body);
   }
 
   return { body: parsedBody, params: parsedParams, query: parsedQuery };
