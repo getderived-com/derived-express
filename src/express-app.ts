@@ -32,20 +32,11 @@ app.use(
   }),
 );
 
-app.use((req, res, next) => {
-  (req as any).user = {
-    id: 1,
-    name: "John Doe",
-    email: "john.doe@example.com",
-  };
-  next();
-});
-
 app.use("/api/public/v1", publicRouter);
 
 app.use("/api/v1", routerv1);
 
-app.use("*", (_, res: Response) => {
+app.use("", (_, res: Response) => {
   res.status(404).json({
     success: false,
     message: "Route not found",
