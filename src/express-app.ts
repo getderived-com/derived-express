@@ -4,6 +4,7 @@ import routerv1 from "./routes/v1/router";
 import { errorHandler } from "./shared/middlewares/error-handler.middleware";
 import { APP_SETTINGS } from "./shared/app-settings";
 import publicRouter from "./routes/v1/public-router";
+// import here
 
 const app: Express = express();
 
@@ -31,6 +32,8 @@ app.use(
     lastModified: true,
   }),
 );
+
+// add middleware
 
 app.use("/api/public/v1", publicRouter);
 
