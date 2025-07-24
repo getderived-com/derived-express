@@ -1,0 +1,29 @@
+{
+  "name": "api",
+  "versi  on": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "nodemon --exec \"node -r esbuild-register ./src/main.ts\" -e .ts",
+    "start": "node -r esbuild-register ./src/main.ts",
+    "format": "prettier --write .",
+    "lint": "prettier --check ."
+  },
+  "dependencies": {
+    "dotenv": "16.4.5",
+    "express": "5.1.0",
+    "jsonwebtoken": "9.0.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^20.11.24",
+    "esbuild": "^0.20.1",
+    "esbuild-register": "^3.5.0",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.9"
+  }
+}
