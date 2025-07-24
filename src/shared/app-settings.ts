@@ -1,21 +1,10 @@
 const {
   NODE_ENV = "development",
-  PORT = 3001,
+  PORT = 3000,
   JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production",
   JWT_EXPIRES_IN = "7d",
   ALLOWED_ORIGINS = "http://localhost:3000",
   DATABASE_URL = "",
-  // AI Configuration
-  OPENAI_API_KEY = "",
-  GOOGLE_AI_API_KEY = "",
-  ANTHROPIC_API_KEY = "",
-  DEFAULT_AI_PROVIDER = "google",
-  DEFAULT_AI_MODEL = "",
-  AI_TEMPERATURE = "0.7",
-  AI_MAX_TOKENS = "4000",
-  GOOGLE_CLIENT_ID = "",
-  GOOGLE_CLIENT_SECRET = "",
-  REDIRECT_URI = "",
 } = process.env;
 
 if (NODE_ENV === "production") {
@@ -43,18 +32,5 @@ export const APP_SETTINGS = {
   JWT_SECRET,
   JWT_EXPIRES_IN,
   ALLOWED_ORIGINS,
-  DATABASE_URL,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  REDIRECT_URI,
-  // AI Configuration
-  AI: {
-    OPENAI_API_KEY,
-    GOOGLE_AI_API_KEY,
-    ANTHROPIC_API_KEY,
-    DEFAULT_AI_PROVIDER,
-    DEFAULT_AI_MODEL,
-    AI_TEMPERATURE: parseFloat(AI_TEMPERATURE),
-    AI_MAX_TOKENS: parseInt(AI_MAX_TOKENS),
-  },
+  DATABASE_URL
 };
