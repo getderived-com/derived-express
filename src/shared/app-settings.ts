@@ -1,3 +1,5 @@
+import * as dotenv from "dotenv";
+dotenv.config({ path: `${process.cwd()}/.env` });
 const {
   NODE_ENV = "development",
   PORT = 3000,
