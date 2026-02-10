@@ -5,6 +5,8 @@ import app from "./express-app";
 import { APP_SETTINGS } from "./shared/app-settings";
 import cluster from "cluster";
 import os from "os";
+import { initializeKafka, startKafkaConsumers, shutdownKafka } from "./shared/kafka/kafka-init";
+import { kafkaClient } from "./shared/kafka/kafka-client";
 
 const gracefulShutdown = (server: http.Server) => {
   const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGUSR2"];
@@ -20,6 +22,9 @@ const gracefulShutdown = (server: http.Server) => {
         }
 
         try {
+          if (APP_SETTINGS.KAFKA.ENABLED) {
+            await shutdownKafka();
+          }
           process.exit(0);
         } catch (error) {
           console.error("Error during shutdown:", error);
@@ -38,13 +43,18 @@ const gracefulShutdown = (server: http.Server) => {
 const setupHealthCheck = (server: http.Server) => {
   app.get("/health", async (req, res) => {
     try {
+      const kafkaHealthy = APP_SETTINGS.KAFKA.ENABLED ? await kafkaClient.healthCheck() : true;
+
       res.status(200).json({
-        status: "healthy",
+        status: kafkaHealthy ? "healthy" : "degraded",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: APP_SETTINGS.NODE_ENV,
+        services: {
+          kafka: APP_SETTINGS.KAFKA.ENABLED ? (kafkaHealthy ? "up" : "down") : "disabled",
+        }
       });
-    } catch (error) {
+    } catch (error: any) {
       res.status(503).json({
         status: "unhealthy",
         timestamp: new Date().toISOString(),
@@ -56,6 +66,12 @@ const setupHealthCheck = (server: http.Server) => {
 
 async function startServer() {
   try {
+    // Initialize Kafka if enabled
+    if (APP_SETTINGS.KAFKA.ENABLED) {
+      await initializeKafka();
+      await startKafkaConsumers();
+    }
+
     const server = http.createServer(app);
 
     setupHealthCheck(server);

@@ -7,10 +7,21 @@ const {
   JWT_EXPIRES_IN = "7d",
   ALLOWED_ORIGINS = "http://localhost:3000",
   DATABASE_URL = "",
+
+  // Kafka Configuration
+  KAFKA_BROKERS = "localhost:9092",
+  KAFKA_CLIENT_ID = "express-api",
+  KAFKA_GROUP_ID = "express-api-consumer-group",
+  KAFKA_CONNECTION_TIMEOUT = "10000",
+  KAFKA_REQUEST_TIMEOUT = "30000",
+  KAFKA_RETRY_ATTEMPTS = "5",
+  KAFKA_RETRY_BACKOFF_MS = "300",
+  KAFKA_LOG_LEVEL = "info",
+  ENABLE_KAFKA = "true",
 } = process.env;
 
 if (NODE_ENV === "production") {
-  const requiredEnvVars = ["JWT_SECRET", "DATABASE_URL"];
+  const requiredEnvVars = ["JWT_SECRET", "DATABASE_URL", "KAFKA_BROKERS"];
   const missingVars = requiredEnvVars.filter(
     (varName) => !process.env[varName],
   );
@@ -34,5 +45,21 @@ export const APP_SETTINGS = {
   JWT_SECRET,
   JWT_EXPIRES_IN,
   ALLOWED_ORIGINS,
-  DATABASE_URL
+  DATABASE_URL,
+
+  // Kafka Settings
+  KAFKA: {
+    BROKERS: KAFKA_BROKERS.split(","),
+    CLIENT_ID: KAFKA_CLIENT_ID,
+    GROUP_ID: KAFKA_GROUP_ID,
+    CONNECTION_TIMEOUT: parseInt(KAFKA_CONNECTION_TIMEOUT),
+    REQUEST_TIMEOUT: parseInt(KAFKA_REQUEST_TIMEOUT),
+    RETRY: {
+      ATTEMPTS: parseInt(KAFKA_RETRY_ATTEMPTS),
+      BACKOFF_MS: parseInt(KAFKA_RETRY_BACKOFF_MS),
+    },
+    LOG_LEVEL: KAFKA_LOG_LEVEL as "debug" | "info" | "warn" | "error",
+    ENABLED: ENABLE_KAFKA !== "false",
+  },
 };
+
