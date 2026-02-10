@@ -1,0 +1,10 @@
+{
+  "addedBlocks": [
+    {
+      "code": "crud_endpoints_8646",
+      "input": {
+        "name": "country"
+      }
+    }
+  ]
+}
