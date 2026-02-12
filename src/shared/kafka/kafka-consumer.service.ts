@@ -19,12 +19,30 @@ interface ConsumerConfig {
     fromBeginning?: boolean;
     autoCommit?: boolean;
     maxRetries?: number;
+    enableDLQ?: boolean;
+}
+
+interface ConsumerMetrics {
+    totalProcessed: number;
+    totalFailed: number;
+    totalRetries: number;
+    lastProcessedAt?: Date;
+    averageProcessingTime: number;
 }
 
 export class KafkaConsumerService {
     private static instance: KafkaConsumerService;
     private handlers: Map<string, EventHandler> = new Map();
     private isRunning = false;
+    private isPaused = false;
+    private metrics: ConsumerMetrics = {
+        totalProcessed: 0,
+        totalFailed: 0,
+        totalRetries: 0,
+        averageProcessingTime: 0,
+    };
+    private processingTimes: number[] = [];
+    private currentConfig?: ConsumerConfig;
 
     private constructor() { }
 
@@ -43,7 +61,7 @@ export class KafkaConsumerService {
         handler: EventHandler<T>
     ): void {
         this.handlers.set(eventType, handler as EventHandler);
-        console.log(`Handler registered for event type: ${eventType}`);
+        this.log("info", "Handler registered", { eventType });
     }
 
     /**
@@ -51,11 +69,12 @@ export class KafkaConsumerService {
      */
     public async start(config: ConsumerConfig): Promise<void> {
         if (this.isRunning) {
-            console.warn("Consumer is already running");
+            this.log("warn", "Consumer is already running");
             return;
         }
 
         try {
+            this.currentConfig = config;
             const consumer = await kafkaClient.getConsumer(config.groupId);
 
             // Subscribe to topics
@@ -64,20 +83,27 @@ export class KafkaConsumerService {
                 fromBeginning: config.fromBeginning ?? false,
             });
 
-            console.log(`Subscribed to topics: ${config.topics.join(", ")}`);
+            this.log("info", "Subscribed to topics", { topics: config.topics });
 
             // Start consuming
             await consumer.run({
                 autoCommit: config.autoCommit ?? true,
                 eachMessage: async (payload: EachMessagePayload) => {
-                    await this.handleMessage(payload, config.maxRetries ?? 3);
+                    // Handle pause state
+                    while (this.isPaused) {
+                        await this.sleep(100);
+                    }
+                    await this.handleMessage(payload, config);
                 },
             });
 
             this.isRunning = true;
-            console.log("Kafka consumer started successfully");
+            this.log("info", "Kafka consumer started successfully", {
+                topics: config.topics,
+                groupId: config.groupId,
+            });
         } catch (error) {
-            console.error("Failed to start Kafka consumer:", error);
+            this.log("error", "Failed to start Kafka consumer", { error });
             throw error;
         }
     }
@@ -87,13 +113,14 @@ export class KafkaConsumerService {
      */
     private async handleMessage(
         payload: EachMessagePayload,
-        maxRetries: number
+        config: ConsumerConfig
     ): Promise<void> {
         const { topic, partition, message } = payload;
+        const startTime = Date.now();
 
         try {
             if (!message.value) {
-                console.warn("Received message with no value");
+                this.log("warn", "Received message with no value", { topic, partition });
                 return;
             }
 
@@ -101,7 +128,7 @@ export class KafkaConsumerService {
             const rawEvent = JSON.parse(message.value.toString());
             const event = EventSchema.parse(rawEvent);
 
-            console.log(`Received event:`, {
+            this.log("info", "Received event", {
                 eventType: event.eventType,
                 eventId: event.eventId,
                 topic,
@@ -113,7 +140,9 @@ export class KafkaConsumerService {
             const handler = this.handlers.get(event.eventType);
 
             if (!handler) {
-                console.warn(`No handler registered for event type: ${event.eventType}`);
+                this.log("warn", "No handler registered for event type", {
+                    eventType: event.eventType,
+                });
                 return;
             }
 
@@ -127,19 +156,32 @@ export class KafkaConsumerService {
             // Execute handler with retry logic
             await this.executeWithRetry(
                 () => handler(event, context),
-                maxRetries,
+                config.maxRetries ?? 3,
                 event
             );
 
-            console.log(`Event processed successfully:`, {
+            this.metrics.totalProcessed++;
+            this.metrics.lastProcessedAt = new Date();
+            this.updateProcessingMetrics(Date.now() - startTime);
+
+            this.log("info", "Event processed successfully", {
                 eventType: event.eventType,
                 eventId: event.eventId,
+                processingTimeMs: Date.now() - startTime,
             });
         } catch (error) {
-            console.error("Error processing message:", error);
+            this.metrics.totalFailed++;
+            this.log("error", "Error processing message", {
+                topic,
+                partition,
+                offset: message.offset,
+                error,
+            });
 
-            // Send to DLQ
-            await this.sendToDeadLetterQueue(payload, error);
+            // Send to DLQ if enabled
+            if (config.enableDLQ !== false) {
+                await this.sendToDeadLetterQueue(payload, error);
+            }
         }
     }
 
@@ -159,12 +201,16 @@ export class KafkaConsumerService {
                 return; // Success
             } catch (error) {
                 lastError = error as Error;
+                this.metrics.totalRetries++;
 
                 if (attempt < maxRetries) {
                     const backoffMs = Math.min(1000 * Math.pow(2, attempt), 30000);
-                    console.warn(
-                        `Retry attempt ${attempt + 1}/${maxRetries} for event ${event.eventId} after ${backoffMs}ms`
-                    );
+                    this.log("warn", "Retrying event processing", {
+                        eventId: event.eventId,
+                        attempt: attempt + 1,
+                        maxRetries,
+                        backoffMs,
+                    });
                     await this.sleep(backoffMs);
                 }
             }
@@ -196,10 +242,30 @@ export class KafkaConsumerService {
                 },
             });
 
-            console.log(`Message sent to DLQ from topic ${topic}`);
+            this.log("info", "Message sent to DLQ", {
+                originalTopic: topic,
+                partition,
+                offset: message.offset,
+            });
         } catch (dlqError) {
-            console.error("Failed to send message to DLQ:", dlqError);
+            this.log("error", "Failed to send message to DLQ", { error: dlqError });
         }
+    }
+
+    /**
+     * Pause message consumption (for backpressure handling)
+     */
+    public pause(): void {
+        this.isPaused = true;
+        this.log("info", "Consumer paused");
+    }
+
+    /**
+     * Resume message consumption
+     */
+    public resume(): void {
+        this.isPaused = false;
+        this.log("info", "Consumer resumed");
     }
 
     /**
@@ -211,7 +277,47 @@ export class KafkaConsumerService {
         }
 
         this.isRunning = false;
-        console.log("Kafka consumer stopped");
+        this.log("info", "Kafka consumer stopped");
+    }
+
+    public getMetrics(): ConsumerMetrics {
+        return { ...this.metrics };
+    }
+
+    public isConsumerRunning(): boolean {
+        return this.isRunning;
+    }
+
+    public isConsumerPaused(): boolean {
+        return this.isPaused;
+    }
+
+    private updateProcessingMetrics(processingTime: number): void {
+        this.processingTimes.push(processingTime);
+        // Keep only last 100 processing times for average calculation
+        if (this.processingTimes.length > 100) {
+            this.processingTimes.shift();
+        }
+        this.metrics.averageProcessingTime =
+            this.processingTimes.reduce((a, b) => a + b, 0) / this.processingTimes.length;
+    }
+
+    private log(level: "info" | "warn" | "error", message: string, context?: Record<string, any>): void {
+        const logData = {
+            timestamp: new Date().toISOString(),
+            level,
+            component: "KafkaConsumer",
+            message,
+            ...context,
+        };
+
+        if (level === "error") {
+            console.error(JSON.stringify(logData));
+        } else if (level === "warn") {
+            console.warn(JSON.stringify(logData));
+        } else {
+            console.log(JSON.stringify(logData));
+        }
     }
 
     private sleep(ms: number): Promise<void> {

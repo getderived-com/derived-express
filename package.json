@@ -11,6 +11,10 @@
     "lint": "prettier --check ."
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.987.0",
+    "@aws-sdk/client-secrets-manager": "^3.987.0",
+    "@aws-sdk/lib-storage": "^3.987.0",
+    "@aws-sdk/s3-request-presigner": "^3.987.0",
     "dotenv": "16.4.5",
     "drizzle-orm": "^0.30.0",
     "express": "5.1.0",
