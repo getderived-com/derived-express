@@ -1,7 +1,9 @@
 import express, { Express, Response } from "express";
 import path from "path";
 import routerv1 from "./routes/v1/router";
+import morgan from "morgan";
 import { errorHandler } from "./shared/middlewares/error-handler.middleware";
+import { stream } from "./shared/logger";
 import { APP_SETTINGS } from "./shared/app-settings";
 import publicRouter from "./routes/v1/public-router";
 // import here
@@ -9,6 +11,8 @@ import publicRouter from "./routes/v1/public-router";
 const app: Express = express();
 
 app.set("trust proxy", 1);
+
+app.use(morgan(APP_SETTINGS.IS_PRODUCTION ? "combined" : "dev", { stream }));
 
 app.use(
   express.json({

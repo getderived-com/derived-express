@@ -7,17 +7,18 @@ import cluster from "cluster";
 import os from "os";
 import { initializeKafka, startKafkaConsumers, shutdownKafka } from "./shared/kafka/kafka-init";
 import { kafkaClient } from "./shared/kafka/kafka-client";
+import { logger } from "./shared/logger";
 
 const gracefulShutdown = (server: http.Server) => {
   const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGUSR2"];
 
   signals.forEach((signal) => {
     process.on(signal, async () => {
-      console.log(`Received ${signal}. Starting graceful shutdown...`);
+      logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
       server.close(async (err) => {
         if (err) {
-          console.error("Error during server shutdown:", err);
+          logger.error("Error during server shutdown:", err);
           process.exit(1);
         }
 
@@ -27,13 +28,13 @@ const gracefulShutdown = (server: http.Server) => {
           }
           process.exit(0);
         } catch (error) {
-          console.error("Error during shutdown:", error);
+          logger.error("Error during shutdown:", error);
           process.exit(1);
         }
       });
 
       setTimeout(() => {
-        console.error("Forcing shutdown after timeout");
+        logger.error("Forcing shutdown after timeout");
         process.exit(1);
       }, 10000);
     });
@@ -79,41 +80,41 @@ async function startServer() {
     gracefulShutdown(server);
 
     server.listen(APP_SETTINGS.PORT, () => {
-      console.log(
+      logger.info(
         `${APP_SETTINGS.NODE_ENV.toUpperCase()} server started at port ${APP_SETTINGS.PORT}`,
       );
 
       if (APP_SETTINGS.IS_PRODUCTION) {
-        console.log("Running in production mode");
+        logger.info("Running in production mode");
       }
     });
 
     process.on("uncaughtException", (error) => {
-      console.error("Uncaught Exception:", error);
+      logger.error("Uncaught Exception:", error);
       process.exit(1);
     });
 
     process.on("unhandledRejection", (reason, promise) => {
-      console.error("Unhandled Rejection at:", promise, "reason:", reason);
+      logger.error("Unhandled Rejection at:", promise, "reason:", reason);
       process.exit(1);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error("Failed to start server:", error);
     process.exit(1);
   }
 }
 
 if (APP_SETTINGS.IS_PRODUCTION && cluster.isPrimary) {
   const numCPUs = os.cpus().length;
-  console.log(`Master ${process.pid} is running`);
-  console.log(`Forking ${numCPUs} workers...`);
+  logger.info(`Master ${process.pid} is running`);
+  logger.info(`Forking ${numCPUs} workers...`);
 
   for (let i = 0; i < numCPUs; i++) {
     cluster.fork();
   }
 
   cluster.on("exit", (worker, code, signal) => {
-    console.log(`Worker ${worker.process.pid} died`);
+    logger.info(`Worker ${worker.process.pid} died`);
     cluster.fork();
   });
 } else {

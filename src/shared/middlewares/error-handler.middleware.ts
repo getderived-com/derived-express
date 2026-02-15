@@ -1,5 +1,6 @@
 import type { Response, Request } from "express";
 import { HttpError } from "../utils/http-errors.util";
+import { logger } from "../logger";
 import { APP_SETTINGS } from "../app-settings";
 
 interface ErrorResponse {
@@ -35,7 +36,7 @@ export const errorHandler = (err: Error, req: Request, res: Response) => {
     errorResponse.stack = err.stack;
   }
 
-  console.error(`[Error] ${errorMessage}`, {
+  logger.error(`[Error] ${errorMessage}`, {
     statusCode,
     isOperational,
     stack: err.stack,
