@@ -253,14 +253,33 @@ export class OpenAIService {
     request: OpenAITextRequest,
     mcpServers: OpenAIMcpServerDefinition[],
   ): Promise<OpenAITextResponse> {
-    return this.createResponse(
-      {
-        ...request,
-      },
-      {
-        mcpServers,
-      },
-    );
+    const context = this.createContext("mcp", request);
+    const startedAt = Date.now();
+
+    this.logStarted(context);
+
+    try {
+      const response = await this.client.responses.create({
+        model: context.model,
+        input: request.input,
+        instructions: request.instructions,
+        temperature: request.temperature,
+        max_output_tokens: request.maxOutputTokens,
+        tools: mapMcpServersToOpenAITools(mcpServers) as any,
+      } as any);
+
+      const result = this.normalizeResponse(response as any, context.model);
+      this.logSuccess(context, startedAt, result.usage?.totalTokens);
+      return result;
+    } catch (error) {
+      const mappedError = mapOpenAIError(error, {
+        operation: context.operation,
+        requestId: context.requestId,
+      });
+
+      this.logFailure(context, startedAt, mappedError.code);
+      throw mappedError;
+    }
   }
 
   private createContext(
